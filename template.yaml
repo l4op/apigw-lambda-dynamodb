@@ -1,0 +1,61 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  PutItem
+
+  Serverless template to manage a request that comes from Api Gateway to Lambda and gets stored into DynamoDb
+
+Globals:
+  Function:
+    Timeout: 20
+    Runtime: java11
+    Architectures:
+      - arm64
+    MemorySize: 512
+    Environment:
+      Variables:
+        JAVA_TOOL_OPTIONS:  -XX:+TieredCompilation -XX:TieredStopAtLevel=1
+
+Resources:
+
+  #API Gateway created using SAM simple declaration
+  ItemAPIGateway:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: dev
+      Name: item-api-gateway
+
+  #Lambda function
+  PutItemLambda:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: it.loooop.PutItem::handleRequest
+      CodeUri: .
+      Environment:
+        Variables:
+          DYNAMODB_ITEMS_TABLE: !Ref ItemsTable
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref ItemsTable
+      Events:
+        ApiEvents:
+          Type: Api
+          Properties:
+            Path: /item
+            Method: POST
+            RestApiId: !Ref ItemAPIGateway
+
+  #DynamoDB table created using SAM simple declaration
+  ItemsTable:
+    Type: AWS::Serverless::SimpleTable
+    Properties:
+      TableName: items
+      PrimaryKey:
+        Name: itemId
+        Type: String
+
+Outputs:
+  ItemEndpoint:
+    Description: API Gateway Endpoint
+    Value:
+      Fn::Sub: https://${ItemAPIGateway}.execute-api.${AWS::Region}.amazonaws.com/dev
